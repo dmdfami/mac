@@ -102,16 +102,18 @@ pkill -f "cloudflared tunnel" 2>/dev/null
 sleep 1
 launchctl load ~/Library/LaunchAgents/com.cloudflare.tunnel.plist
 
-# 6. Claude CLI keychain unlock hint
-# 6. Claude CLI keychain unlock
-# 6. Claude CLI — unlock keychain for SSH access
+# 6. Claude CLI — export credentials for SSH access
 echo "[6/6] Claude CLI..."
 if command -v claude &>/dev/null; then
-  echo "      Enter your Mac login password to unlock keychain:"
-  read -s -p "      Password: " KPASS
-  echo ""
-  security unlock-keychain -p "$KPASS" ~/Library/Keychains/login.keychain-db 2>/dev/null && echo "      Keychain unlocked!" || echo "      Wrong password (skip)"
-  unset KPASS
+  CRED=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null)
+  if [ -n "$CRED" ]; then
+    mkdir -p ~/.claude
+    echo "$CRED" > ~/.claude/.credentials
+    chmod 600 ~/.claude/.credentials
+    echo "      Credentials exported for SSH access!"
+  else
+    echo "      No credentials found. Run 'claude' and /login first."
+  fi
 else
   echo "      Claude CLI not installed (skip)"
 fi
