@@ -330,11 +330,8 @@ if [ "$NAME" = "live" ]; then
   fi
   echo "  Press Q or Ctrl+C to stop."
   echo ""
-  # Step 1: Deploy capture script to remote Mac
-  run_remote "$LIVE_TARGET" "$addr" "$method" "cat > /tmp/.mac-live.py << 'PYEOF'
-import Quartz,CoreFoundation,sys,time,os
-q=float(sys.argv[1]);d=float(sys.argv[2])
-fd=os.fdopen(sys.stdout.fileno(),'wb',0)
+  # Remote Python: CoreGraphics screen capture → MJPEG to stdout
+  PYCMD="import Quartz,CoreFoundation,sys,time;q=$QUALITY;d=$FPS
 while True:
  img=Quartz.CGWindowListCreateImage(Quartz.CGRectInfinite,Quartz.kCGWindowListOptionOnScreenOnly,Quartz.kCGNullWindowID,0)
  if img is None:time.sleep(0.5);continue
@@ -343,18 +340,17 @@ while True:
  Quartz.CGImageDestinationAddImage(dst,img,{Quartz.kCGImageDestinationLossyCompressionQuality:q})
  Quartz.CGImageDestinationFinalize(dst)
  buf=CoreFoundation.CFDataGetBytes(data,CoreFoundation.CFRangeMake(0,CoreFoundation.CFDataGetLength(data)),None)
- fd.write(buf)
- time.sleep(d)
-PYEOF" >/dev/null
-  # Step 2: Stream — run remote script → SSH pipe → local ffplay
+ sys.stdout.buffer.write(buf);sys.stdout.buffer.flush()
+ time.sleep(d)"
+  # Stream: SSH python3 -c → pipe → local ffplay
   if [ "$method" = "tunnel" ]; then
     host=$(echo "$addr" | sed 's|https://||')
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
       -o ProxyCommand="cloudflared access ssh --hostname $host" \
-      "$LIVE_TARGET@$host" "python3 /tmp/.mac-live.py $QUALITY $FPS" 2>/dev/null
+      "$LIVE_TARGET@$host" "python3 -c '$PYCMD'" 2>/dev/null
   else
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-      "$LIVE_TARGET@$addr" "python3 /tmp/.mac-live.py $QUALITY $FPS" 2>/dev/null
+      "$LIVE_TARGET@$addr" "python3 -c '$PYCMD'" 2>/dev/null
   fi | ffplay -f mjpeg -probesize 32 -fflags nobuffer -framedrop \
     -window_title "Live: $LIVE_TARGET" -loglevel quiet -i - 2>/dev/null
   echo "  Stream ended."
