@@ -358,19 +358,24 @@ if [ "$NAME" = "watch" ]; then
           keystroke return
         end tell
       end tell" 2>/dev/null
-    # Step 2: Wait for VNC session to fully connect, then switch to observe mode
+    # Step 2: Wait for VNC session, reopen window, switch to observe mode
     echo "  Waiting for session..."
     sleep 8
     osascript -e '
-      tell application "Screen Sharing" to activate
-      delay 0.5
+      tell application "Screen Sharing"
+        activate
+        reopen
+      end tell
+      delay 2
       tell application "System Events"
         tell process "Screen Sharing"
-          tell toolbar 1 of window 1
-            if value of checkbox 1 is true then
-              click checkbox 1
-            end if
-          end tell
+          if (count of windows) > 0 then
+            tell toolbar 1 of window 1
+              if value of checkbox 1 is true then
+                click checkbox 1
+              end if
+            end tell
+          end if
         end tell
       end tell' 2>/dev/null && echo "  Switched to observe mode." || echo "  Could not switch to observe mode."
   fi

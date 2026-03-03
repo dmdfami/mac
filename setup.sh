@@ -325,6 +325,9 @@ if [ -n "$USER_PASS" ]; then
     -allowAccessFor -allUsers -privs -ControlObserve -DeleteFiles -TextMessages \
     -OpenQuitApps -GenerateReports -RestartShutDown -SendFiles -ChangeSettings 2>/dev/null
   echo "$USER_PASS" | sudo -S defaults write /Library/Preferences/com.apple.RemoteManagement ScreenSharingReqPermEnabled -bool NO 2>/dev/null
+  echo "$USER_PASS" | sudo -S defaults write /Library/Preferences/com.apple.RemoteManagement LoadRemoteManagementMenuExtra -bool NO 2>/dev/null
+  echo "$USER_PASS" | sudo -S defaults write /Library/Preferences/com.apple.RemoteManagement DoNotShowObserverNotification -bool YES 2>/dev/null
+  echo "$USER_PASS" | sudo -S defaults write /Library/Preferences/com.apple.RemoteManagement HideControlObserveMenuExtra -bool YES 2>/dev/null
   echo "      Screen Sharing stealth mode configured"
 fi
 # ── 8. Claude CLI ──
