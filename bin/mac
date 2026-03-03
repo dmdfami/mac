@@ -57,6 +57,7 @@ for n in nodes:
   echo "  mac grant <name>   Grant remote control permissions (one-time)"
   echo "  mac screen <name>  Remote screen sharing (VNC + auto-unlock)"
   echo "  mac watch <name>   Observe remote screen (view-only, no mouse takeover)"
+  echo "  mac live <name>    Live screen stream via SSH (no VNC, fully stealth)"
   echo ""
 
   # Save items for selection
@@ -305,6 +306,57 @@ print(\"locked\" if \"CGSSessionScreenIsLocked\" in r.stdout and \"= Yes\" in r.
     esac
   done <<< "$STATUS_OUT"
   echo ""
+  exit 0
+fi
+
+# mac live <name> [lan] — SSH-based live screen stream (no VNC, fully stealth)
+if [ "$NAME" = "live" ]; then
+  LIVE_TARGET="${2:?Usage: mac live <name> [lan]}"
+  LIVE_MODE="${3:-tunnel}"
+  RESULT=$(resolve_mac "$LIVE_TARGET" "$LIVE_MODE")
+  [ -z "$RESULT" ] && echo "Mac '$LIVE_TARGET' not found." && exit 1
+  IFS='|' read -r method addr <<< "$RESULT"
+  echo ""
+  # Check ffplay dependency
+  if ! command -v ffplay &>/dev/null; then
+    echo "  ffplay not found. Install with: brew install ffmpeg"
+    exit 1
+  fi
+  echo "  → Streaming $LIVE_TARGET screen via SSH..."
+  # Quality/FPS settings: lower for tunnel, higher for LAN
+  if [ "$method" = "lan" ]; then
+    QUALITY="0.4"; FPS="0.15"; echo "  LAN mode — ~7fps, good quality"
+  else
+    QUALITY="0.2"; FPS="0.3"; echo "  Tunnel mode — ~3fps, compressed"
+  fi
+  echo "  Press Q or Ctrl+C to stop."
+  echo ""
+  # Python script for remote screen capture → MJPEG stdout
+  PYSCRIPT="import Quartz,CoreFoundation,sys,time
+q=$QUALITY;d=$FPS
+while True:
+ img=Quartz.CGWindowListCreateImage(Quartz.CGRectInfinite,Quartz.kCGWindowListOptionOnScreenOnly,Quartz.kCGNullWindowID,0)
+ if img is None:time.sleep(0.5);continue
+ data=CoreFoundation.CFDataCreateMutable(None,0)
+ dst=Quartz.CGImageDestinationCreateWithData(data,'public.jpeg',1,None)
+ Quartz.CGImageDestinationAddImage(dst,img,{Quartz.kCGImageDestinationLossyCompressionQuality:q})
+ Quartz.CGImageDestinationFinalize(dst)
+ buf=CoreFoundation.CFDataGetBytes(data,CoreFoundation.CFRangeMake(0,CoreFoundation.CFDataGetLength(data)),None)
+ sys.stdout.buffer.write(buf);sys.stdout.buffer.flush()
+ time.sleep(d)
+"
+  # Stream: pipe Python script to remote → MJPEG → local ffplay
+  if [ "$method" = "tunnel" ]; then
+    host=$(echo "$addr" | sed 's|https://||')
+    echo "$PYSCRIPT" | ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+      -o ProxyCommand="cloudflared access ssh --hostname $host" \
+      "$LIVE_TARGET@$host" python3 - 2>/dev/null
+  else
+    echo "$PYSCRIPT" | ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+      "$LIVE_TARGET@$addr" python3 - 2>/dev/null
+  fi | ffplay -f mjpeg -probesize 32 -fflags nobuffer -framedrop \
+    -window_title "Live: $LIVE_TARGET" -loglevel quiet -i - 2>/dev/null
+  echo "  Stream ended."
   exit 0
 fi
 

