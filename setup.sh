@@ -292,66 +292,65 @@ SDEOF
 fi
 
 # ── 7. Grant AppleScript automation (one-time per app) ──
-echo "[7/9] Granting remote control permissions..."
-echo "      If a dialog appears, click 'Allow' — one-time only."
-GRANT_APPS=(
-  # Communication
-  "Notes|tell application \"Notes\" to get name of first note"
-  "Mail|tell application \"Mail\" to get name of first mailbox"
-  "Messages|tell application \"Messages\" to get name of first service"
-  "WhatsApp|tell application \"WhatsApp\" to get name"
-  "Zalo|tell application \"Zalo\" to get name"
-  "Contacts|tell application \"Contacts\" to get name of first person"
-  "FaceTime|tell application \"FaceTime\" to get name"
-  # Productivity
-  "Calendar|tell application \"Calendar\" to get name of first calendar"
-  "Reminders|tell application \"Reminders\" to get name of first list"
-  "Freeform|tell application \"Freeform\" to get name"
-  "Stickies|tell application \"Stickies\" to get name"
-  "Numbers|tell application \"Numbers\" to get name"
-  "Pages|tell application \"Pages\" to get name"
-  "Keynote|tell application \"Keynote\" to get name"
-  "TextEdit|tell application \"TextEdit\" to get name"
-  "Shortcuts|tell application \"Shortcuts\" to get name"
-  # Media
-  "Photos|tell application \"Photos\" to get name"
-  "Music|tell application \"Music\" to get name"
-  "Podcasts|tell application \"Podcasts\" to get name"
-  "Books|tell application \"Books\" to get name"
-  "QuickTime Player|tell application \"QuickTime Player\" to get name"
-  "Voice Memos|tell application \"Voice Memos\" to get name"
-  # Browsers
-  "Safari|tell application \"Safari\" to get name"
-  "Google Chrome|tell application \"Google Chrome\" to get name"
-  # System
-  "System Events|tell application \"System Events\" to get name"
-  "Finder|tell application \"Finder\" to get name"
-  "System Settings|tell application \"System Settings\" to get name"
-  "Preview|tell application \"Preview\" to get name"
-  "Maps|tell application \"Maps\" to get name"
-  # Microsoft Office
-  "Microsoft Word|tell application \"Microsoft Word\" to get name"
-  "Microsoft Excel|tell application \"Microsoft Excel\" to get name"
-  "Microsoft Outlook|tell application \"Microsoft Outlook\" to get name"
-  # Pro apps
-  "Final Cut Pro|tell application \"Final Cut Pro\" to get name"
-  "Logic Pro|tell application \"Logic Pro\" to get name"
-  # AI
-  "ChatGPT|tell application \"ChatGPT\" to get name"
-)
-GRANTED=0
-TOTAL=${#GRANT_APPS[@]}
-for entry in "${GRANT_APPS[@]}"; do
-  IFS='|' read -r app_name cmd <<< "$entry"
-  # Skip apps not installed
-  osascript -e "id of app \"$app_name\"" >/dev/null 2>&1 || continue
-  # Check if app was already running
-  WAS_RUNNING=$(pgrep -x "$app_name" >/dev/null 2>&1 && echo "1" || echo "0")
-  osascript -e "$cmd" >/dev/null 2>&1 && GRANTED=$((GRANTED+1))
-  # Quit app if we opened it (don't leave 30+ apps open)
-  [ "$WAS_RUNNING" = "0" ] && osascript -e "tell application \"$app_name\" to quit" >/dev/null 2>&1
-done
-echo "      $GRANTED apps granted (skipped uninstalled apps)"
+GRANT_FLAG="$HOME/.ssh/.applescript-granted"
+if [ -f "$GRANT_FLAG" ]; then
+  echo "[7/9] AppleScript permissions already granted (skipping)"
+else
+  echo "[7/9] Granting remote control permissions..."
+  echo "      If a dialog appears, click 'Allow' — one-time only."
+  echo "      Apps will open briefly then close."
+  GRANT_APPS=(
+    "Notes|tell application \"Notes\" to get name of first note"
+    "Mail|tell application \"Mail\" to get name of first mailbox"
+    "Messages|tell application \"Messages\" to get name of first service"
+    "WhatsApp|tell application \"WhatsApp\" to get name"
+    "Zalo|tell application \"Zalo\" to get name"
+    "Contacts|tell application \"Contacts\" to get name of first person"
+    "FaceTime|tell application \"FaceTime\" to get name"
+    "Calendar|tell application \"Calendar\" to get name of first calendar"
+    "Reminders|tell application \"Reminders\" to get name of first list"
+    "Freeform|tell application \"Freeform\" to get name"
+    "Stickies|tell application \"Stickies\" to get name"
+    "Numbers|tell application \"Numbers\" to get name"
+    "Pages|tell application \"Pages\" to get name"
+    "Keynote|tell application \"Keynote\" to get name"
+    "TextEdit|tell application \"TextEdit\" to get name"
+    "Shortcuts|tell application \"Shortcuts\" to get name"
+    "Photos|tell application \"Photos\" to get name"
+    "Music|tell application \"Music\" to get name"
+    "Podcasts|tell application \"Podcasts\" to get name"
+    "Books|tell application \"Books\" to get name"
+    "QuickTime Player|tell application \"QuickTime Player\" to get name"
+    "Voice Memos|tell application \"Voice Memos\" to get name"
+    "Safari|tell application \"Safari\" to get name"
+    "Google Chrome|tell application \"Google Chrome\" to get name"
+    "System Events|tell application \"System Events\" to get name"
+    "Finder|tell application \"Finder\" to get name"
+    "System Settings|tell application \"System Settings\" to get name"
+    "Preview|tell application \"Preview\" to get name"
+    "Maps|tell application \"Maps\" to get name"
+    "Microsoft Word|tell application \"Microsoft Word\" to get name"
+    "Microsoft Excel|tell application \"Microsoft Excel\" to get name"
+    "Microsoft Outlook|tell application \"Microsoft Outlook\" to get name"
+    "Final Cut Pro|tell application \"Final Cut Pro\" to get name"
+    "Logic Pro|tell application \"Logic Pro\" to get name"
+    "ChatGPT|tell application \"ChatGPT\" to get name"
+  )
+  GRANTED=0
+  for entry in "${GRANT_APPS[@]}"; do
+    IFS='|' read -r app_name cmd <<< "$entry"
+    osascript -e "id of app \"$app_name\"" >/dev/null 2>&1 || continue
+    WAS_RUNNING=$(pgrep -x "$app_name" >/dev/null 2>&1 && echo "1" || echo "0")
+    osascript -e "$cmd" >/dev/null 2>&1 && GRANTED=$((GRANTED+1))
+    # Kill app we opened (quit is too slow, some apps ignore quit)
+    if [ "$WAS_RUNNING" = "0" ]; then
+      sleep 0.5
+      pkill -x "$app_name" 2>/dev/null
+    fi
+  done
+  echo "      $GRANTED apps granted"
+  touch "$GRANT_FLAG"
+fi
 
 # ── 7b. Keep apps alive (Mail + WhatsApp background sync every 5 min) ──
 echo "      Keep-apps-alive daemon..."
@@ -414,17 +413,11 @@ if [ -f "$RUSTDESK" ]; then
   echo "$RD_PASS" > ~/.ssh/.rustdesk-pass
   chmod 600 ~/.ssh/.rustdesk-pass
 
-  # Set permanent password
+  # Set permanent password (CLI only — no GUI needed)
   sudo "$RUSTDESK" --password "$RD_PASS" 2>/dev/null
   echo "      Password: Tinh1dem"
 
-  # Start RustDesk hidden (no UI window)
-  open -gja "RustDesk" 2>/dev/null
-  sleep 3
-  # Force hide RustDesk window + dock icon
-  osascript -e 'tell application "System Events" to set visible of process "RustDesk" to false' 2>/dev/null
-
-  # Get RustDesk ID
+  # Get RustDesk ID (CLI only — no GUI needed)
   RD_ID=$("$RUSTDESK" --get-id 2>/dev/null)
   if [ -n "$RD_ID" ]; then
     echo "$RD_ID" > ~/.ssh/.rustdesk-id
